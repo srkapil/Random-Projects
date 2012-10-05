@@ -6,7 +6,7 @@ namespace TimusProj
 {
     class timus1893
     {
-        /*
+        
         static void Main(String[] args)
         {
             String s=Console.ReadLine();
@@ -47,6 +47,6 @@ namespace TimusProj
                 }
             }
 
-        }*/
+        }
     }
 }
