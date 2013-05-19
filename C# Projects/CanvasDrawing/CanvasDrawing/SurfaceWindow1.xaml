@@ -1,0 +1,17 @@
+﻿<s:SurfaceWindow x:Class="CanvasDrawing.SurfaceWindow1"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:s="http://schemas.microsoft.com/surface/2008"
+    Width="1400"
+    Height="900"
+    Title="CanvasDrawing"
+    >
+
+  <Grid>
+        <Canvas Name="myCanvas" Height="900" Width="1400" >
+        </Canvas>
+        <s:SurfaceInkCanvas Name="inkCanvas" Height="900" Width="1400" PreviewMouseDown="canvasMouseDown" PreviewMouseMove="canvasMouseMove" PreviewMouseUp="canvasMouseUp" StrokeCollected="strokeCollected">
+            
+        </s:SurfaceInkCanvas>
+    </Grid>
+</s:SurfaceWindow>
