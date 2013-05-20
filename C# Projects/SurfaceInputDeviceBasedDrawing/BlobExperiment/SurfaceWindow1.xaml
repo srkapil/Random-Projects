@@ -7,11 +7,27 @@
     SizeToContent="WidthAndHeight"
     >
     <Grid>
-        <Canvas Name="myCanvas" Width="1920" Height="1080" Background="Beige" TouchDown="canvas_Touch_Down" TouchUp="canvas_Touch_Up" TouchMove="canvas_Touch_Move">
+        <s:SurfaceInkCanvas Name="inkCanvas" 
+                            Width="1920" 
+                            Height="1080"  
+                            Background="White" 
+                            PreviewTouchDown="canvas_Touch_Down" 
+                            PreviewTouchUp="canvas_Touch_Up" 
+                            PreviewTouchMove="canvas_Touch_Move"
+                            StrokeCollected="inkCanvas_StrokeCollected" 
+                            EditingMode="Ink"  >
+            
+        </s:SurfaceInkCanvas>
+        <Canvas Name="myCanvas" 
+                Width="1920" 
+                Height="1080" 
+                Background="Transparent" 
+                PreviewTouchDown="canvas_Touch_Down" 
+                PreviewTouchUp="canvas_Touch_Up" 
+                PreviewTouchMove="canvas_Touch_Move">
             <TextBlock Name="lengthDisplayer" Foreground="Black" Text="Length Displayer Ready" VerticalAlignment="Bottom" FontSize="16" Canvas.Left="914" Canvas.Top="982"></TextBlock>
             <TextBlock Name="inputDataDisplayer" Width="270" Foreground="Black" Text="Input DATA Displayer Waiting" VerticalAlignment="Bottom" FontSize="12" Canvas.Left="1628" Canvas.Top="6" Height="222">
             </TextBlock>
         </Canvas>
-        
     </Grid>
 </s:SurfaceWindow>

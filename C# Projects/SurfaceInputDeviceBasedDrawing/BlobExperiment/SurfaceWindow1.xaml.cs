@@ -17,6 +17,7 @@ using Microsoft.Surface;
 using Microsoft.Surface.Presentation;
 using Microsoft.Surface.Presentation.Controls;
 using Microsoft.Surface.Presentation.Input;
+using System.Windows.Ink;
 
 /**
  * Author: Kapil
@@ -51,14 +52,18 @@ namespace BlobExperiment
             detectedInputs.FontSize = 20;
             detectedInputs.Text = "Waiting for touch devices";
 
-            boundingCirlce.Fill = System.Windows.Media.Brushes.Chartreuse;
+            boundingCirlce.Fill = System.Windows.Media.Brushes.Blue;
             boundingCirlce.Stroke = System.Windows.Media.Brushes.Black;
-            boundingCirlce.StrokeThickness = 2.5;
+            boundingCirlce.Opacity = 0.25;
+            boundingCirlce.StrokeThickness = 2.0;
             boundingCirlce.Visibility = Visibility.Hidden;
             boundingCirlce.Data = circle;
+            boundingCirlce.PreviewTouchDown += inkCanvasForceCapture;
             myCanvas.Children.Add(boundingCirlce);
             myCanvas.Children.Add(detectedInputs);
-            
+
+            inkCanvas.DefaultDrawingAttributes.Color = Color.FromRgb(0, 0, 0);
+            inkCanvas.DefaultDrawingAttributes.FitToCurve = true;
             // Add handlers for window availability events
             AddWindowAvailabilityHandlers();
         }
@@ -135,6 +140,7 @@ namespace BlobExperiment
         Int32 noOfTags = 0;
         bool blobDetected;
         bool tagDetected;
+        bool fingerTouchDetected;
         private void canvas_Touch_Down(object sender, TouchEventArgs e)
         {
             if (e.TouchDevice.GetIsTagRecognized()) //Tags
@@ -142,11 +148,12 @@ namespace BlobExperiment
                 Interlocked.Increment(ref noOfTags);
                 detectedInputs.Text = " Fingers: " + noOfFingerTouches + "\nTags:" + noOfTags + "\nBlobs: " + noOfBlobs;
                 tagTouchDevices.Add(e.TouchDevice);
-                updateMetrics(e.TouchDevice);
+                updateViews(e.TouchDevice);
             }
             else if (e.TouchDevice.GetIsFingerRecognized()) //Finger
             {
                 Interlocked.Increment(ref noOfFingerTouches);
+                fingerTouchDetected = true;
                 detectedInputs.Text = " Fingers: " + noOfFingerTouches + "\nTags:" + noOfTags + "\nBlobs: " + noOfBlobs;
             }
             else//Blobs
@@ -154,9 +161,29 @@ namespace BlobExperiment
                 Interlocked.Increment(ref noOfBlobs);
                 detectedInputs.Text = " Fingers: " + noOfFingerTouches + "\nTags:" + noOfTags + "\nBlobs: " + noOfBlobs;
                 blobTouchDevices.Add(e.TouchDevice);
-                updateMetrics(e.TouchDevice);
+                updateViews(e.TouchDevice);
             }
             updateInputDataDisplayer();
+        }
+
+        bool inDrawingMode = false;
+        //Occurs when the touch input device is moved
+        private void canvas_Touch_Move(object sender, TouchEventArgs e)
+        {
+            //Console.WriteLine("Sender: " + sender);
+            updateInputDataDisplayer();
+
+            //Only draw when two tags are detected and finger touch(es) are detected
+            if (noOfTags == 2 && fingerTouchDetected)
+            {
+                inDrawingMode = true; // we don't want both canvas to call update Metrics
+                updateViews(e.TouchDevice);
+                e.TouchDevice.Capture(inkCanvas);
+                //e.Handled = true;
+            }
+            else inDrawingMode = false;
+            //we don't need to update metrics since normal canvas's event will update it
+            updateViews(e.TouchDevice);
         }
 
 
@@ -173,6 +200,7 @@ namespace BlobExperiment
             {
                 Interlocked.Decrement(ref noOfFingerTouches);
                 detectedInputs.Text = " Fingers: " + noOfFingerTouches + "\nTags:" + noOfTags + "\nBlobs: " + noOfBlobs;
+                if (noOfFingerTouches == 0) fingerTouchDetected = false;
             }
             else
             {
@@ -205,15 +233,9 @@ namespace BlobExperiment
             inputDataDisplayer.Text = sb.ToString();
         }
 
-        private void canvas_Touch_Move(object sender, TouchEventArgs e)
-        {
-            //Occurs when the touch input device is moved
-            updateMetrics(e.TouchDevice);
-            updateInputDataDisplayer();
-        }
 
-        //Used to update the length visualisation
-        private void updateMetrics(TouchDevice callee)
+        //Used to update the length visualisation and displys the bounding circle (using length as the radius)
+        private void updateViews(TouchDevice callee)
         {
             // just want to know how WPF handles multi touches and events simulatenously(Observation: This states it is executed by Main: that means other threads just add the event to Main thread's queue :) )
             //Console.WriteLine("Calling Thread: " + Thread.CurrentThread + " Is background Thread? : " + Thread.CurrentThread.IsBackground); 
@@ -224,6 +246,11 @@ namespace BlobExperiment
             else tagDetected = true;
 
             Double distance = 0;
+
+            //Drag the length displayer closer to the calling canvas's point
+            lengthDisplayer.SetValue(Canvas.LeftProperty, (Double)callee.GetCenterPosition(this).X + 200);
+            lengthDisplayer.SetValue(Canvas.TopProperty, (Double)callee.GetCenterPosition(this).Y + 10);
+
             //update length
             if (blobDetected)
             {
@@ -231,7 +258,6 @@ namespace BlobExperiment
                 //Console.WriteLine( "Blob List SIze" + blobTouchDevices.Count + "  TAG List Size : " + tagTouchDevices.Count);
                 if (noOfBlobs == 1 && noOfTags == 1)
                 {
-                    
                     distance = getDistance(blobTouchDevices[0].GetCenterPosition(this), tagTouchDevices[0].GetCenterPosition(this));
                     lengthDisplayer.Text = "Blob to Tag Distance: " + distance;
                     if (!blob.Equals(callee)) displayBoundingEllipse(distance, blob.GetCenterPosition(this));
@@ -245,12 +271,16 @@ namespace BlobExperiment
             }
             else if (tagDetected)
             {//no blobs detected
-                //Console.WriteLine("Blob List SIze" + blobTouchDevices.Count + "  TAG List Size : " + tagTouchDevices.Count);
                 if (noOfTags == 2)
                 {
                     distance = getDistance(tagTouchDevices[0].GetCenterPosition(this), tagTouchDevices[1].GetCenterPosition(this));
                     lengthDisplayer.Text = "Tags Distance: " + distance;
-                    //displayBoundingEllipse(distance, callee.GetCenterPosition(this));
+
+                    TouchDevice bigTag;
+                    //We are not interested in the moving part's tag. As we use the bigger tag for updating center of the bounding circle
+                    if (tagTouchDevices[0] != callee) bigTag = tagTouchDevices[0];
+                    else bigTag = tagTouchDevices[1];
+                    displayBoundingEllipse(distance, bigTag.GetCenterPosition(this));
                 }
             }
             else
@@ -268,6 +298,7 @@ namespace BlobExperiment
             circle.Center = center;
             circle.RadiusX = radius;
             circle.RadiusY = radius;
+            
             //we surely dont want to do any transformation if we want the radius to change while keeping the center consistent
             //boundingCirlce.RenderTransform = new TranslateTransform(center.X, center.Y);
             //boundingCirlce.Margin = new Thickness(center.X, center.Y, 0, 0);
@@ -281,5 +312,21 @@ namespace BlobExperiment
             //Console.WriteLine(x_dist + " : " + y_dist);
             return Math.Sqrt(x_dist * x_dist + y_dist * y_dist);
         }
-    }
+
+        private void inkCanvas_StrokeCollected(object sender, InkCanvasStrokeCollectedEventArgs e)
+        {
+            Stroke s = e.Stroke;
+            Console.WriteLine("inkCanvas_StrokeCollected Called");
+            //Left for future work 
+            //You can implement the snapping feature here
+            //Also note we have inkCanvas.DefaultDrawingAttributes.FitToCurve = true; inside constructor
+            // You may not wanna use that
+        }
+
+        private void inkCanvasForceCapture(object sender, TouchEventArgs e)
+        {
+            Console.WriteLine(" inkCanvasForceCapture Called");
+            inkCanvas.CaptureTouch(e.TouchDevice);
+        }
+    } 
 }
